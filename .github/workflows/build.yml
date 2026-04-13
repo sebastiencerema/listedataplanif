@@ -16,7 +16,7 @@ jobs:
       - name: Récupération des données Grist
         run: |
           HTTP_CODE=$(curl -s -o grist_data.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GRIST_TOKEN }}" \
+            -H "Authorization: Bearer 735d2bacb84cd36e840122cc1fce0df43b770487" \
             -H "Accept: application/json" \
             "https://grist.numerique.gouv.fr/api/docs/2c2QQhgJdL1LZ41reEeSvj/tables/7/records")
 
