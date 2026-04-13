@@ -231,7 +231,7 @@
 
 .select-option:hover {
   background: #ececff;
-}v
+}
 </style>
 </head>
 <body>
@@ -406,18 +406,13 @@ function showFiche(chemin) {
    ÉVÉNEMENTS
 ================================================================ */
 selN1.addEventListener("change", () => {
-  selCouche.disabled = true;
-  selCouche.innerHTML = `<option value="">— choisir une donnée —</option>`;
-  setInfo("<p class='state-msg'>Sélectionner une donnée précise pour afficher ses informations.</p>", true);
-  if (selN1.value) populateCouche(selN1.value);
-});
+  customSelect.classList.add("disabled");
+  dropdown.innerHTML = "";
+  selectDisplay.textContent = "— choisir une donnée —";
 
-selCouche.addEventListener("change", () => {
-  if (!selCouche.value) {
-    setInfo("<p class='state-msg'>Sélectionner une donnée précise pour afficher ses informations.</p>", true);
-  } else {
-    showFiche(selCouche.value);
-  }
+  setInfo("<p class='state-msg'>Sélectionner une donnée précise pour afficher ses informations.</p>", true);
+
+  if (selN1.value) populateCouche(selN1.value);
 });
 
 selectDisplay.addEventListener("click", () => {
