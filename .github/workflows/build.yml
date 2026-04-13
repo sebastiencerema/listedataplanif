@@ -2,12 +2,13 @@ name: Build catalogue Géolittoral
 
 on:
   schedule:
-    - cron: '0 6 * * *'    # tous les jours à 6h UTC
-  workflow_dispatch:         # déclenchement manuel depuis l'onglet Actions
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: GRIST_TOKEN
 
     steps:
       - name: Checkout du repo
@@ -16,7 +17,7 @@ jobs:
       - name: Récupération des données Grist
         run: |
           HTTP_CODE=$(curl -s -o grist_data.json -w "%{http_code}" \
-            -H "Authorization: Bearer 735d2bacb84cd36e840122cc1fce0df43b770487" \
+            -H "Authorization: Bearer ${{ vars.GRIST_TOKEN }}" \
             -H "Accept: application/json" \
             "https://grist.numerique.gouv.fr/api/docs/2c2QQhgJdL1LZ41reEeSvj/tables/7/records")
 
@@ -27,7 +28,7 @@ jobs:
             echo "Contenu de la réponse :"
             cat grist_data.json
             echo "--- FIN ---"
-            echo "Erreur : Grist a répondu $HTTP_CODE (vérifier le secret GRIST_TOKEN)"
+            echo "Erreur : Grist a répondu $HTTP_CODE"
             exit 1
           fi
 
@@ -36,7 +37,7 @@ jobs:
           with open('grist_data.json') as f:
               data = json.load(f)
           n = len(data.get('records', []))
-          print(f'OK — {n} enregistrements récupérés')
+          print(f'OK — {n} enregistrements recuperes')
           if n == 0:
               sys.exit(1)
           "
@@ -44,30 +45,23 @@ jobs:
       - name: Injection dans le HTML
         run: |
           mkdir -p docs
+          export BUILD_DATE=$(date -u '+%d/%m/%Y a %H:%MZ')
 
-          BUILD_DATE=$(date -u '+%d/%m/%Y à %H:%MZ')
-          DATA=$(cat grist_data.json)
-
-          # Remplacement du placeholder __GRIST_DATA__ par le JSON
-          # et ajout de la constante BUILD_DATE
           python3 - <<'EOF'
-          import json, pathlib
+          import pathlib, os
 
-          html   = pathlib.Path("index.html").read_text(encoding="utf-8")
-          data   = pathlib.Path("grist_data.json").read_text(encoding="utf-8")
-          date   = "$BUILD_DATE"
+          html = pathlib.Path("index.html").read_text(encoding="utf-8")
+          data = pathlib.Path("grist_data.json").read_text(encoding="utf-8")
+          date = os.environ.get("BUILD_DATE", "")
 
-          # Injection données
           html = html.replace("__GRIST_DATA__", data)
-
-          # Injection date de build juste avant </script> final
           html = html.replace(
               "/* ================================================================\n   LANCEMENT",
               f'const BUILD_DATE = "{date}";\n\n/* ================================================================\n   LANCEMENT'
           )
 
           pathlib.Path("docs/index.html").write_text(html, encoding="utf-8")
-          print("HTML généré dans docs/index.html")
+          print("HTML genere dans docs/index.html")
           EOF
 
       - name: Commit et push
@@ -77,4 +71,4 @@ jobs:
           git add docs/index.html
           git diff --staged --quiet \
             && echo "Aucune modification, pas de commit." \
-            || (git commit -m "build: màj données Grist $(date -u +%Y-%m-%dT%H:%M)Z" && git push)
+            || (git commit -m "build: maj donnees Grist $(date -u +%Y-%m-%dT%H:%M)Z" && git push)
