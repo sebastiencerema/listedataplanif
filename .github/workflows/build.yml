@@ -1,0 +1,71 @@
+name: Build catalogue Géolittoral
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # tous les jours à 6h UTC
+  workflow_dispatch:         # déclenchement manuel depuis l'onglet Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Récupération des données Grist
+        run: |
+          curl -s \
+            -H "Authorization: Bearer ${{ secrets.GRIST_TOKEN }}" \
+            -H "Accept: application/json" \
+            "https://grist.numerique.gouv.fr/api/docs/2c2QQhgJdL1LZ41reEeSvj/tables/7/records" \
+            > grist_data.json
+
+          # Vérification que le JSON est valide et non vide
+          python3 -c "
+          import json, sys
+          with open('grist_data.json') as f:
+              data = json.load(f)
+          n = len(data.get('records', []))
+          print(f'OK — {n} enregistrements récupérés')
+          if n == 0:
+              sys.exit(1)
+          "
+
+      - name: Injection dans le HTML
+        run: |
+          mkdir -p docs
+
+          BUILD_DATE=$(date -u '+%d/%m/%Y à %H:%MZ')
+          DATA=$(cat grist_data.json)
+
+          # Remplacement du placeholder __GRIST_DATA__ par le JSON
+          # et ajout de la constante BUILD_DATE
+          python3 - <<'EOF'
+          import json, pathlib
+
+          html   = pathlib.Path("index.html").read_text(encoding="utf-8")
+          data   = pathlib.Path("grist_data.json").read_text(encoding="utf-8")
+          date   = "$BUILD_DATE"
+
+          # Injection données
+          html = html.replace("__GRIST_DATA__", data)
+
+          # Injection date de build juste avant </script> final
+          html = html.replace(
+              "/* ================================================================\n   LANCEMENT",
+              f'const BUILD_DATE = "{date}";\n\n/* ================================================================\n   LANCEMENT'
+          )
+
+          pathlib.Path("docs/index.html").write_text(html, encoding="utf-8")
+          print("HTML généré dans docs/index.html")
+          EOF
+
+      - name: Commit et push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git diff --staged --quiet \
+            && echo "Aucune modification, pas de commit." \
+            || (git commit -m "build: màj données Grist $(date -u +%Y-%m-%dT%H:%M)Z" && git push)
