@@ -9,6 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: GRIST_TOKEN
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout du repo
