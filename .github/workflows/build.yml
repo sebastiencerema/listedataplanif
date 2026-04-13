@@ -15,13 +15,22 @@ jobs:
 
       - name: Récupération des données Grist
         run: |
-          curl -s \
+          HTTP_CODE=$(curl -s -o grist_data.json -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GRIST_TOKEN }}" \
             -H "Accept: application/json" \
-            "https://grist.numerique.gouv.fr/api/docs/2c2QQhgJdL1LZ41reEeSvj/tables/7/records" \
-            > grist_data.json
+            "https://grist.numerique.gouv.fr/api/docs/2c2QQhgJdL1LZ41reEeSvj/tables/7/records")
 
-          # Vérification que le JSON est valide et non vide
+          echo "HTTP status : $HTTP_CODE"
+          echo "Taille réponse : $(wc -c < grist_data.json) octets"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Contenu de la réponse :"
+            cat grist_data.json
+            echo "--- FIN ---"
+            echo "Erreur : Grist a répondu $HTTP_CODE (vérifier le secret GRIST_TOKEN)"
+            exit 1
+          fi
+
           python3 -c "
           import json, sys
           with open('grist_data.json') as f:
